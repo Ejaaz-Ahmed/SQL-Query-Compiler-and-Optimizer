@@ -1,0 +1,4 @@
+{
+  "employees": ["id", "name", "dept_id"],
+  "departments": ["id", "dept_name"]
+}

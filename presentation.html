@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Query Optimizer Compiler Presentation</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;700&family=Inter:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg-primary: #f8fafc;
+      --bg-secondary: #ffffff;
+      --bg-tertiary: #f1f5f9;
+      --border-color: #cbd5e1;
+      --text-primary: #0f172a;
+      --text-secondary: #334155;
+      --text-muted: #64748b;
+      --accent-primary: #1e3a8a;
+      /* Deep Slate Blue */
+      --accent-secondary: #0f766e;
+      /* Academic Teal */
+      --accent-critical: #991b1b;
+      /* Dark Red */
+      --accent-green: #166534;
+      /* Dark Green */
+      --accent-purple: #581c87;
+      /* Purple for compilers */
+      --font-sans: 'Inter', sans-serif;
+      --font-mono: 'Fira Code', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-primary);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      background-image: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+    }
+
+    /* Slides Container */
+    .slides-container {
+      flex: 1;
+      position: relative;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Individual Slide */
+    .slide {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateX(40px);
+      transition: all 0.4s cubic-bezier(0.25, 1, 0.5, 1);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      padding: 2rem 6%;
+      z-index: 1;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translateX(0);
+      z-index: 2;
+    }
+
+    .slide.previous {
+      transform: translateX(-40px);
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 2.8rem;
+      font-weight: 800;
+      color: var(--accent-primary);
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.5px;
+      line-height: 1.15;
+      text-align: center;
+    }
+
+    .subtitle {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+      font-weight: 400;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+      color: var(--accent-primary);
+      border-bottom: 2px solid var(--border-color);
+      padding-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      width: 100%;
+    }
+
+    p {
+      font-size: 0.95rem;
+      line-height: 1.45;
+      color: var(--text-secondary);
+      margin-bottom: 1rem;
+    }
+
+    /* Layout Grids */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      width: 100%;
+      align-items: start;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+      width: 100%;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 1.25rem;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .card:hover {
+      transform: translateY(-2px);
+      border-color: var(--accent-primary);
+      box-shadow: 0 8px 12px -3px rgba(0, 0, 0, 0.05), 0 3px 5px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .card-title {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--accent-primary);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-title svg {
+      color: var(--accent-primary);
+    }
+
+    .card p {
+      font-size: 0.88rem;
+      margin-bottom: 0;
+      line-height: 1.4;
+    }
+
+    /* Bullets styling */
+    ul.bullet-list {
+      list-style: none;
+      width: 100%;
+      padding-left: 1.25rem;
+    }
+
+    ul.bullet-list li {
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      position: relative;
+    }
+
+    ul.bullet-list li::before {
+      content: '▪';
+      color: var(--accent-primary);
+      position: absolute;
+      left: -1.25rem;
+      top: 0;
+      font-size: 0.95rem;
+    }
+
+    /* Chevron / Step Pipeline (Corporate style) */
+    .pipeline {
+      display: flex;
+      width: 100%;
+      margin: 0.5rem 0;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .pipeline-step {
+      flex: 1;
+      padding: 0.85rem;
+      text-align: center;
+      position: relative;
+      border-right: 1px solid var(--border-color);
+    }
+
+    .pipeline-step:last-child {
+      border-right: none;
+    }
+
+    .pipeline-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--accent-primary);
+      color: var(--bg-secondary);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.75rem;
+      font-weight: bold;
+      margin-bottom: 0.35rem;
+    }
+
+    .pipeline-step.highlight .pipeline-num {
+      background: var(--accent-secondary);
+    }
+
+    .pipeline-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 0.2rem;
+    }
+
+    .pipeline-text {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      line-height: 1.25;
+    }
+
+    /* Flowchart Node Grid style */
+    .flowchart {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      margin: 0.75rem 0;
+      gap: 0.5rem;
+    }
+
+    .flowchart-node {
+      background: var(--bg-secondary);
+      border: 1.5px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.85rem 0.5rem;
+      flex: 1;
+      text-align: center;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+      position: relative;
+    }
+
+    .flowchart-node.highlight {
+      border-color: var(--accent-primary);
+      background: #eff6ff;
+    }
+
+    .flowchart-node.success {
+      border-color: var(--accent-green);
+      background: #f0fdf4;
+    }
+
+    .flowchart-node-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--accent-primary);
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .flowchart-node.success .flowchart-node-title {
+      color: var(--accent-green);
+    }
+
+    .flowchart-node-desc {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      line-height: 1.3;
+    }
+
+    .flowchart-arrow {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      font-weight: bold;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Comparison Table */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 0.5rem 0;
+      font-size: 0.85rem;
+    }
+
+    .comp-table th,
+    .comp-table td {
+      border: 1px solid var(--border-color);
+      padding: 0.6rem;
+      text-align: left;
+    }
+
+    .comp-table th {
+      background-color: var(--bg-tertiary);
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .comp-table tr:nth-child(even) {
+      background-color: #f8fafc;
+    }
+
+    .text-green {
+      color: var(--accent-green);
+      font-weight: 600;
+    }
+
+    .text-red {
+      color: var(--accent-critical);
+      font-weight: 600;
+    }
+
+    /* Code Blocks */
+    pre {
+      background-color: #f1f5f9;
+      border: 1px solid var(--border-color);
+      border-radius: 6px;
+      padding: 0.65rem;
+      font-family: var(--font-mono);
+      font-size: 0.75rem;
+      color: var(--text-primary);
+      overflow-x: auto;
+      width: 100%;
+      max-height: 200px;
+      font-variant-ligatures: none;
+      -webkit-font-variant-ligatures: none;
+      font-feature-settings: "liga" 0;
+    }
+
+    code {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      font-variant-ligatures: none;
+      -webkit-font-variant-ligatures: none;
+      font-feature-settings: "liga" 0;
+    }
+
+    /* AST Node Tree Infographic */
+    .ast-tree-container {
+      display: flex;
+      justify-content: space-around;
+      width: 100%;
+      margin: 0.5rem 0;
+      gap: 1rem;
+    }
+
+    .ast-tree-box {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.75rem;
+      flex: 1;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    }
+
+    .ast-tree-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--accent-primary);
+      text-align: center;
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border-color);
+      padding-bottom: 0.25rem;
+    }
+
+    .ast-node {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding-left: 0.75rem;
+      border-left: 1.5px dashed var(--border-color);
+      margin: 0.15rem 0;
+    }
+
+    .ast-node-header {
+      font-weight: 600;
+      color: var(--accent-secondary);
+    }
+
+    /* Rules grid */
+    .rules-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1rem;
+      width: 100%;
+    }
+
+    .rule-card {
+      border: 1px solid var(--border-color);
+      background: var(--bg-secondary);
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.03);
+    }
+
+    .rule-type-badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      font-size: 0.65rem;
+      font-weight: 700;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      border-radius: 4px;
+      color: var(--accent-secondary);
+      text-transform: uppercase;
+      margin-bottom: 0.4rem;
+    }
+
+    .rule-card h4 {
+      font-size: 0.95rem;
+      color: var(--text-primary);
+      margin-bottom: 0.35rem;
+    }
+
+    .rule-card p {
+      font-size: 0.8rem;
+      line-height: 1.35;
+      margin-bottom: 0.4rem;
+    }
+
+    /* Schema Binding Infographic */
+    .schema-map {
+      display: flex;
+      width: 100%;
+      justify-content: space-between;
+      align-items: stretch;
+      gap: 1.5rem;
+      margin: 0.5rem 0;
+    }
+
+    .schema-map-col {
+      flex: 1;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-color);
+      border-radius: 8px;
+      padding: 0.85rem;
+    }
+
+    .schema-map-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-align: center;
+      margin-bottom: 0.5rem;
+      color: var(--accent-primary);
+      text-transform: uppercase;
+    }
+
+    .schema-db-table {
+      border: 1.5px solid var(--border-color);
+      border-radius: 6px;
+      margin-bottom: 0.5rem;
+      overflow: hidden;
+    }
+
+    .schema-db-header {
+      background: var(--bg-tertiary);
+      font-size: 0.8rem;
+      font-weight: 700;
+      padding: 0.35rem;
+      color: var(--accent-primary);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .schema-db-cols {
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      padding: 0.35rem;
+      background: white;
+    }
+
+    .schema-db-col-item {
+      padding: 0.15rem 0;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* Team Members slide style */
+    .team-container {
+      display: flex;
+      gap: 2.5rem;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+
+    .member-name {
+      font-size: 1.15rem;
+      font-weight: 500;
+      color: var(--text-primary);
+      border-bottom: 1px dashed var(--text-muted);
+      padding-bottom: 0.25rem;
+    }
+
+    /* Controls Bar at bottom */
+    .controls-bar {
+      height: 55px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 3rem;
+      z-index: 100;
+      box-shadow: 0 -4px 6px -1px rgba(0, 0, 0, 0.03);
+    }
+
+    .progress-track {
+      width: 250px;
+      height: 4px;
+      background: var(--bg-tertiary);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent-primary);
+      transition: width 0.3s ease;
+    }
+
+    .btn-nav {
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border-color);
+      color: var(--text-primary);
+      width: 36px;
+      height: 36px;
+      border-radius: 4px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .btn-nav:hover {
+      background: var(--accent-primary);
+      color: var(--bg-secondary);
+      border-color: var(--accent-primary);
+    }
+
+    .nav-buttons {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .slide-counter {
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      font-size: 0.85rem;
+    }
+
+    .tag {
+      background-color: var(--bg-tertiary);
+      color: var(--accent-primary);
+      border: 1px solid var(--border-color);
+      padding: 0.25rem 0.75rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="slides-container">
+
+    <!-- Slide 1: Title Slide -->
+    <div class="slide active">
+      <div style="text-align: center;">
+        <span class="tag" style="margin-bottom: 1.5rem; display: inline-block;">Course Exhibition: Compiler
+          Construction</span>
+        <h1>SQL Query Optimizer & Compiler</h1>
+        <p class="subtitle" style="max-width: 850px; margin: 1rem auto 2.5rem;">
+          A hand-written compilation and analysis framework with AST-level optimization passes and real-time execution
+          benchmarks.
+        </p>
+        <p
+          style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 1rem;">
+          Project Developed By
+        </p>
+        <div class="team-container">
+          <div class="member-name">Ejaz Ahmed</div>
+          <div class="member-name">Abdullah</div>
+          <div class="member-name">Ali Haider</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 2: Challenge vs. Project Objective -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+        </svg>
+        The Performance Challenge vs. Compiler Objective
+      </h2>
+      <div class="grid-2" style="margin-top: 0.5rem;">
+        <!-- Challenge Card -->
+        <div class="card" style="border-left: 4px solid var(--accent-critical);">
+          <div class="card-title" style="color: var(--accent-critical);">
+            🚨 THE SQL PERFORMANCE PROBLEM
+          </div>
+          <p style="margin-bottom: 0.85rem; font-weight: 600; font-size: 0.88rem;">Why database queries execute
+            sub-optimally:</p>
+          <ul class="bullet-list">
+            <li><strong>Redundant Conditions:</strong> Frameworks and programmers generate dead conditions like
+              <code>WHERE 1=1 AND status = 'A'</code>, wasting parser/evaluator cycles.
+            </li>
+            <li><strong>Delayed Filtering:</strong> Applying table filters *after* joins forces databases to build
+              massive intermediate cross-product relations in memory.</li>
+            <li><strong>Opaque Execution Plans:</strong> Relational engines perform optimizations hidden from
+              developers, offering no visibility into the parsing or AST structures.</li>
+          </ul>
+        </div>
+
+        <!-- Solution Card -->
+        <div class="card" style="border-left: 4px solid var(--accent-green);">
+          <div class="card-title" style="color: var(--accent-green);">
+            ✓ THE COMPILER-DRIVEN SOLUTION
+          </div>
+          <p style="margin-bottom: 0.85rem; font-weight: 600; font-size: 0.88rem;">How our optimization framework
+            resolves these gaps:</p>
+          <ul class="bullet-list">
+            <li><strong>AST Simplification:</strong> Translates statements into an AST, resolving and folding constant
+              conditions prior to database execution.</li>
+            <li><strong>Early Join Filtering:</strong> Pushes filter conditions directly into the <code>JOIN ON</code>
+              criteria, shrinking joining relation sizes.</li>
+            <li><strong>Full Visualization:</strong> Exposes the complete compiler pipeline—from raw source and tokens
+              to the AST and optimized query outputs.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 3: Compiler Architecture & Pipeline (Flowchart) -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polygon points="12 2 2 7 12 12 22 7 12 2" />
+          <polyline points="2 17 12 22 22 17" />
+          <polyline points="2 12 12 17 22 12" />
+        </svg>
+        Compiler Architecture & Data Flow Pipeline
+      </h2>
+      <p style="font-size: 0.9rem; margin-bottom: 0.5rem; text-align: center; max-width: 900px;">
+        A modular multi-stage translation and optimization pipeline processing input SQL query statements:
+      </p>
+
+      <!-- Flowchart Diagram -->
+      <div class="flowchart">
+        <div class="flowchart-node">
+          <div class="flowchart-node-title">1. Lexer (Scanner)</div>
+          <div class="flowchart-node-desc">Regex Tokenizer<br>Yields token list<br><code>SELECT</code>, <code>ID</code>,
+            <code>EQ</code>
+          </div>
+        </div>
+        <div class="flowchart-arrow">→</div>
+
+        <div class="flowchart-node highlight">
+          <div class="flowchart-node-title">2. Parser</div>
+          <div class="flowchart-node-desc">Recursive Descent<br>Builds initial AST<br><code>Query</code>,
+            <code>Join</code> nodes
+          </div>
+        </div>
+        <div class="flowchart-arrow">→</div>
+
+        <div class="flowchart-node">
+          <div class="flowchart-node-title">3. Semantic Checker</div>
+          <div class="flowchart-node-desc">Schema Binding<br>Aliases & types<br>Validates identifiers</div>
+        </div>
+        <div class="flowchart-arrow">→</div>
+
+        <div class="flowchart-node highlight">
+          <div class="flowchart-node-title">4. AST Optimizer</div>
+          <div class="flowchart-node-desc">Runs fold + pushdown<br>Mutates AST nodes<br>Reduces operator cost</div>
+        </div>
+        <div class="flowchart-arrow">→</div>
+
+        <div class="flowchart-node">
+          <div class="flowchart-node-title">5. Code Generator</div>
+          <div class="flowchart-node-desc">AST Traversal<br>Emits optimized SQL<br>String reconstruction</div>
+        </div>
+        <div class="flowchart-arrow">→</div>
+
+        <div class="flowchart-node success">
+          <div class="flowchart-node-title">6. SQLite WAL</div>
+          <div class="flowchart-node-desc">Concurrent executes<br>Benchmarking<br>Speedup ratio UI</div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 0.5rem;">
+        <div class="card">
+          <div class="card-title">Analysis Front-End (Stages 1-3)</div>
+          <ul class="bullet-list" style="font-size: 0.8rem;">
+            <li>Regex tokenization avoids lexer generator overhead (e.g. Lex/Flex).</li>
+            <li>Recursive descent parser handles operators precedence (AND/OR, comparisons).</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">Synthesis & Execution Back-End (Stages 4-6)</div>
+          <ul class="bullet-list" style="font-size: 0.8rem;">
+            <li>AST nodes are passed through two isolated visitor-like optimization traversals.</li>
+            <li>The generated SQL is dispatched to an SQLite database instance for differential benchmarking.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 4: Lexer & Parser (Visual Pipeline) -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <line x1="16" y1="13" x2="8" y2="13" />
+          <line x1="16" y1="17" x2="8" y2="17" />
+        </svg>
+        Lexical Analysis & Syntactic Parser Engine
+      </h2>
+
+      <div class="pipeline">
+        <div class="pipeline-step">
+          <div class="pipeline-num">1</div>
+          <div class="pipeline-title">Raw SQL Input</div>
+          <div class="pipeline-text">Reads: <code>SELECT name FROM employees WHERE salary > 50000;</code></div>
+        </div>
+        <div class="pipeline-step highlight">
+          <div class="pipeline-num">2</div>
+          <div class="pipeline-title">Regex Lexing</div>
+          <div class="pipeline-text">Matches patterns: <code>SELECT</code> (Keyword), <code>name</code> (ID),
+            <code>></code> (GT), <code>50000</code> (Num)
+          </div>
+        </div>
+        <div class="pipeline-step">
+          <div class="pipeline-num">3</div>
+          <div class="pipeline-title">Syntactic Parse</div>
+          <div class="pipeline-text">Recursive descent functions match grammar expectations.</div>
+        </div>
+        <div class="pipeline-step highlight">
+          <div class="pipeline-num">4</div>
+          <div class="pipeline-title">AST Generation</div>
+          <div class="pipeline-text">Outputs linked node classes: <code>Query(columns, from_clause, where)</code></div>
+        </div>
+      </div>
+
+      <div class="grid-2" style="margin-top: 0.5rem; align-items: stretch;">
+        <div class="card">
+          <div class="card-title">Lexer Pattern Matching</div>
+          <p style="font-size: 0.8rem; margin-bottom: 0.5rem;">A hand-written regular expression array distinguishes
+            literals, numbers, and identifiers:</p>
+          <pre><code># Regex tokenizer definition (lexer.py)
+pattern = re.compile(r"""
+    \s*(?P&lt;NUMBER&gt;\d+)
+    |\s*(?P&lt;STRING&gt;'[^']*')
+    |\s*(?P&lt;ID&gt;[a-zA-Z_][a-zA-Z0-9_]*)
+    |\s*(?P&lt;EQ&gt;=)|\s*(?P&lt;LT&gt;&lt;)|\s*(?P&lt;GT&gt;&gt;)
+""", re.VERBOSE)</code></pre>
+        </div>
+
+        <div class="card">
+          <div class="card-title">Parser Lookahead Grammar</div>
+          <p style="font-size: 0.8rem; margin-bottom: 0.5rem;">Recursive descent functions enforceoperator precedence
+            hierarchy without shift-reduce conflicts:</p>
+          <pre><code># condition parse hierarchy (parser.py)
+def parse_condition(self):
+    return self.parse_or_condition()
+
+def parse_or_condition(self):
+    left = self.parse_and_condition()
+    # matches OR tokens recursively...</code></pre>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 5: Semantic Checker & Schema Resolution -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+          <polyline points="22 4 12 14.01 9 11.01" />
+        </svg>
+        Semantic Analyzer & Database Schema Binding
+      </h2>
+      <p style="font-size: 0.9rem; margin-bottom: 0.5rem; text-align: center;">
+        The Semantic Checker binds raw syntactic nodes to the relational schema, converting identifiers to fully
+        qualified fields.
+      </p>
+
+      <div class="schema-map">
+        <!-- Input AST columns -->
+        <div class="schema-map-col" style="border-left: 4px solid var(--accent-secondary);">
+          <div class="schema-map-title">1. AST Columns Input</div>
+          <div class="card" style="margin-bottom: 0.5rem; padding: 0.6rem;">
+            <code style="font-size: 0.75rem; color: var(--accent-purple);">Column(table=None, name="salary")</code>
+            <span style="font-size: 0.7rem; color: var(--text-muted); display: block;">Unresolved reference</span>
+          </div>
+          <div class="card" style="padding: 0.6rem;">
+            <code style="font-size: 0.75rem; color: var(--accent-purple);">Column(table="e", name="name")</code>
+            <span style="font-size: 0.7rem; color: var(--text-muted); display: block;">Table alias referenced</span>
+          </div>
+        </div>
+
+        <!-- Binding engine -->
+        <div class="schema-map-col"
+          style="border-left: 4px solid var(--accent-primary); display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 0.5rem;">
+          <div class="schema-map-title">2. Resolution Steps</div>
+          <div
+            style="font-size: 0.75rem; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.4rem; width: 100%; background: #f8fafc;">
+            Match Alias <code>e</code> ➔ <code>employees</code>
+          </div>
+          <div
+            style="font-size: 0.75rem; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.4rem; width: 100%; background: #f8fafc;">
+            Search schemas for <code>salary</code>
+          </div>
+          <div
+            style="font-size: 0.75rem; text-align: center; border: 1px solid var(--border-color); border-radius: 4px; padding: 0.4rem; width: 100%; background: #f8fafc;">
+            Verify types: <code>salary (REAL) > 50000 (INT)</code>
+          </div>
+        </div>
+
+        <!-- DB Schema target -->
+        <div class="schema-map-col" style="border-left: 4px solid var(--accent-green);">
+          <div class="schema-map-title">3. Database Schemas</div>
+          <div class="schema-db-table">
+            <div class="schema-db-header">employees <span style="font-weight: normal; font-size: 0.7rem;">Table</span>
+            </div>
+            <div class="schema-db-cols">
+              <div class="schema-db-col-item"><span>id</span> <span>INTEGER</span></div>
+              <div class="schema-db-col-item" style="background:#f0fdf4;"><span>name</span> <span
+                  class="text-green">TEXT</span></div>
+              <div class="schema-db-col-item" style="background:#f0fdf4;"><span>salary</span> <span
+                  class="text-green">REAL</span></div>
+              <div class="schema-db-col-item"><span>dept_id</span> <span>INTEGER</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div
+        style="width: 100%; text-align: center; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary); margin-top: 0.25rem;">
+        ⚠️ Raises Semantic errors for missing tables, columns, ambiguous references, or invalid comparison data types.
+      </div>
+    </div>
+
+    <!-- Slide 6: Constant Folding (AST Tree Transformation) -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+        </svg>
+        Optimization Pass 1: Constant Folding
+      </h2>
+      <p style="font-size: 0.88rem; margin-bottom: 0.5rem; text-align: center;">
+        Pre-evaluates comparisons containing only constants and simplifies logic gates recursively:
+      </p>
+
+      <div class="ast-tree-container">
+        <!-- Before Folding -->
+        <div class="ast-tree-box" style="border-top: 4px solid var(--accent-critical);">
+          <div class="ast-tree-title">Original Condition Tree</div>
+          <div class="ast-node"><span class="ast-node-header">Condition(AND)</span>
+            <div class="ast-node"><span class="ast-node-header">Condition(COMP)</span>
+              <div style="padding-left: 0.5rem; font-family: monospace; font-size: 0.7rem; color: var(--text-muted);">
+                left: Column(salary), op: '>', right: Constant(50000)</div>
+            </div>
+            <div class="ast-node"><span class="ast-node-header">Condition(COMP)</span>
+              <div
+                style="padding-left: 0.5rem; font-family: monospace; font-size: 0.7rem; color: var(--text-muted); background: #fef2f2; display: inline-block;">
+                left: Constant(1), op: '=', right: Constant(1)</div>
+            </div>
+          </div>
+          <div style="margin-top: 0.5rem; font-size: 0.75rem; color: var(--text-secondary);">
+            Query: <code>... WHERE salary > 50000 AND 1 = 1</code>
+          </div>
+        </div>
+
+        <!-- Execution Transition -->
+        <div
+          style="display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 0.75rem; color: var(--text-muted); max-width: 150px; text-align: center;">
+          <div style="font-weight: 700; color: var(--accent-primary);">Folding Engine</div>
+          <div class="flowchart-arrow">➔</div>
+          <div>1 = 1 evaluates to <strong>TRUE</strong></div>
+          <div class="flowchart-arrow">➔</div>
+          <div><code>X AND TRUE</code> simplies to <code>X</code></div>
+        </div>
+
+        <!-- After Folding -->
+        <div class="ast-tree-box" style="border-top: 4px solid var(--accent-green);">
+          <div class="ast-tree-title">Folded Condition Tree</div>
+          <div class="ast-node" style="background: #f0fdf4;"><span class="ast-node-header">Condition(COMP)</span>
+            <div style="padding-left: 0.5rem; font-family: monospace; font-size: 0.7rem; color: var(--text-secondary);">
+              left: Column(salary), op: '>', right: Constant(50000)</div>
+          </div>
+          <div style="margin-top: 1.1rem; font-size: 0.75rem; color: var(--text-secondary);">
+            Query: <code>... WHERE salary > 50000</code>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-3" style="margin-top: 0.5rem;">
+        <div class="card" style="padding: 0.75rem;">
+          <strong style="font-size: 0.8rem; color: var(--accent-primary); display:block; margin-bottom: 0.25rem;">AND
+            Simplification</strong>
+          <span style="font-family: monospace; font-size: 0.75rem;">FALSE AND X ➔ FALSE<br>TRUE AND X ➔ X</span>
+        </div>
+        <div class="card" style="padding: 0.75rem;">
+          <strong style="font-size: 0.8rem; color: var(--accent-primary); display:block; margin-bottom: 0.25rem;">OR
+            Simplification</strong>
+          <span style="font-family: monospace; font-size: 0.75rem;">TRUE OR X ➔ TRUE<br>FALSE OR X ➔ X</span>
+        </div>
+        <div class="card" style="padding: 0.75rem;">
+          <strong style="font-size: 0.8rem; color: var(--accent-primary); display:block; margin-bottom: 0.25rem;">WHERE
+            Removal</strong>
+          <span style="font-size: 0.75rem; color: var(--text-secondary);">If WHERE clause folds entirely to TRUE, the
+            WHERE condition is removed from the query AST.</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Slide 7: Predicate Pushdown (Visual Query Plan Pushdown) -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="5 12 12 5 19 12" />
+          <path d="M12 5v14" />
+        </svg>
+        Optimization Pass 2: Predicate Pushdown
+      </h2>
+      <p style="font-size: 0.88rem; margin-bottom: 0.5rem; text-align: center;">
+        Analyzes compound condition lists and moves filter expressions directly into matching <code>JOIN ON</code>
+        clauses:
+      </p>
+
+      <div class="grid-2">
+        <div class="card" style="border-top: 3px solid var(--accent-critical);">
+          <div class="card-title" style="color: var(--accent-critical); font-size: 0.9rem;">
+            Before: Filtering After Joining
+          </div>
+          <pre style="font-size: 0.7rem;"><code>SELECT e.name, d.dept_name
+FROM employees e
+JOIN departments d ON e.dept_id = d.id
+WHERE d.dept_name = 'Engineering'</code></pre>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+            <strong>Execution path:</strong>
+            <ol style="margin-left: 1.25rem; margin-top: 0.25rem;">
+              <li>Joins all rows of <code>employees</code> and <code>departments</code> (large output).</li>
+              <li>Filters the huge joined table by <code>dept_name</code>.</li>
+            </ol>
+          </div>
+        </div>
+
+        <div class="card" style="border-top: 3px solid var(--accent-green);">
+          <div class="card-title" style="color: var(--accent-green); font-size: 0.9rem;">
+            After: Pushed Predicate
+          </div>
+          <pre style="font-size: 0.7rem; background-color: #f0fdf4;"><code>SELECT e.name, d.dept_name
+FROM employees e
+JOIN (
+  SELECT * FROM departments 
+  WHERE dept_name = 'Engineering'
+) d ON e.dept_id = d.id</code></pre>
+          <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.5rem;">
+            <strong>Execution path:</strong>
+            <ol style="margin-left: 1.25rem; margin-top: 0.25rem;">
+              <li>Filters <code>departments</code> table rows <em>first</em> during the join process.</li>
+              <li>Performs join only on matching rows, shrinking intermediate sets.</li>
+            </ol>
+          </div>
+        </div>
+      </div>
+
+      <div class="card" style="width:100%; margin-top: 0.75rem; padding: 0.75rem;">
+        <strong style="font-size: 0.85rem; color: var(--accent-primary); display:block; margin-bottom: 0.25rem;">Why it
+          works:</strong>
+        <p style="font-size: 0.78rem; line-height: 1.35; color: var(--text-secondary);">
+          Relational Algebra equivalence: <code>σ_A(R ⋈_θ S) ➔ R ⋈_θ (σ_A(S))</code> when condition <code>A</code> only
+          references attributes in relation <code>S</code>. By pushing the selection predicate down, we reduce the
+          cardinality of relations being joined, yielding substantial query speedups.
+        </p>
+      </div>
+    </div>
+
+    <!-- Slide 8: Full-Stack Integration & SOC Metrics -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+          <line x1="6" y1="6" x2="6.01" y2="6" />
+          <line x1="6" y1="18" x2="6.01" y2="18" />
+        </svg>
+        Full-Stack Integration & Benchmarking Engine
+      </h2>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-title">🚀 FastAPI Backend Router</div>
+          <ul class="bullet-list" style="font-size: 0.82rem;">
+            <li><strong>/api/execute:</strong> Accepts raw SQL, runs Lexer/Parser, checks semantic bindings, applies
+              optimizer, compiles back to SQL, and benchmarks.</li>
+            <li><strong>/api/schema:</strong> Exposes pre-populated tables and columns in JSON format.</li>
+            <li><strong>SQLite database:</strong> Initialized in-memory or in WAL journal mode to test real-world
+              concurrent execution.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <div class="card-title">💻 React 18 User Interface</div>
+          <ul class="bullet-list" style="font-size: 0.82rem;">
+            <li><strong>SQL Editor:</strong> Fully featured query input box with pre-populated samples and a schema
+              panel.</li>
+            <li><strong>Performance Dashboard:</strong> Visually renders comparison metrics (original execution time vs
+              optimized execution time).</li>
+            <li><strong>AST Viewer:</strong> Renders the parsed compiler AST in a readable nested structure for debug
+              analysis.</li>
+          </ul>
+        </div>
+      </div>
+
+      <h3
+        style="margin-top: 1rem; font-size: 1rem; color: var(--accent-primary); width: 100%; border-bottom: 1px solid var(--border-color); padding-bottom: 0.25rem;">
+        Performance Evaluation Benchmarking Results
+      </h3>
+      <table class="comp-table">
+        <thead>
+          <tr>
+            <th>Query Scenario</th>
+            <th>Original SQL execution</th>
+            <th>Optimized SQL execution</th>
+            <th>Speedup / Time Saved</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Constant Folding:</strong> <code>WHERE salary > 50000 AND 1=1</code></td>
+            <td>0.45 ms</td>
+            <td>0.42 ms</td>
+            <td class="text-green">Saved 6.7%</td>
+          </tr>
+          <tr>
+            <td><strong>Predicate Pushdown:</strong>
+              <code>JOIN (SELECT * FROM departments WHERE dept_name = 'Engineering') d</code></td>
+            <td>1.12 ms</td>
+            <td>0.82 ms</td>
+            <td class="text-green">Saved 26.8%</td>
+          </tr>
+          <tr>
+            <td><strong>Combined:</strong> <code>WHERE budget > 100000 AND 1=1 AND salary > 60000</code></td>
+            <td>1.85 ms</td>
+            <td>1.10 ms</td>
+            <td class="text-green">Saved 40.5%</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Slide 9: Achievements & Future Scope -->
+    <div class="slide">
+      <h2>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="20" x2="18" y2="10" />
+          <line x1="12" y1="20" x2="12" y2="4" />
+          <line x1="6" y1="20" x2="6" y2="14" />
+        </svg>
+        Exhibition Milestones & Future Roadmap
+      </h2>
+
+      <div class="grid-2" style="margin-top: 0.5rem;">
+        <!-- Achievements Card -->
+        <div class="card" style="background: #f0fdf4; border-color: rgba(22, 101, 52, 0.2);">
+          <div class="card-title" style="color: var(--accent-green);">
+            ✓ KEY MILESTONES COMPLETED
+          </div>
+          <ul class="bullet-list" style="font-size: 0.82rem;">
+            <li><strong>Hand-written AST Pipeline:</strong> Built a complete compiler parser loop from scratch using
+              recursive descent without lexer generator tools.</li>
+            <li><strong>Double optimization passes:</strong> Successfully integrated Constant Folding and Predicate
+              Pushdown that output valid SQL queries.</li>
+            <li><strong>Stable API Server:</strong> Created a highly reactive FastAPI backend with an SQLite execution
+              environment.</li>
+            <li><strong>Interactive GUI:</strong> Enabled interactive playground with AST explorer toggle and live
+              benchmarking.</li>
+          </ul>
+        </div>
+
+        <!-- Roadmap Card -->
+        <div class="card" style="background: #eff6ff; border-color: rgba(30, 58, 138, 0.2);">
+          <div class="card-title" style="color: var(--accent-primary);">
+            🚀 FUTURE ROADMAP
+          </div>
+          <ul class="bullet-list" style="font-size: 0.82rem;">
+            <li><strong>SQL Language Extensions:</strong> Add parsing and compilation support for aggregate functions
+              (<code>SUM</code>, <code>COUNT</code>), <code>GROUP BY</code>, and subqueries.</li>
+            <li><strong>Cost-Based Optimization (CBO):</strong> Implement join reordering cost logic based on data
+              distribution histograms.</li>
+            <li><strong>Index Recommendation Tool:</strong> Add compiler analysis module suggesting indexes for join
+              conditions.</li>
+            <li><strong>Visual AST Graph:</strong> Render graphical trees with SVG connection curves instead of JSON
+              output.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Bottom Navigation Control Bar -->
+  <div class="controls-bar">
+    <div class="nav-buttons">
+      <button class="btn-nav" id="btn-prev" title="Previous Slide (Left Arrow / Backspace)">◀</button>
+      <button class="btn-nav" id="btn-next" title="Next Slide (Right Arrow / Space / Enter)">▶</button>
+      <div class="slide-counter"><span id="current-slide-num">1</span> / <span id="total-slides-num">9</span></div>
+    </div>
+
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-bar"></div>
+    </div>
+
+    <div style="font-size: 0.8rem; color: var(--text-muted);">
+      Use Arrow Keys, Space or buttons to navigate
+    </div>
+  </div>
+
+  <script>
+    const slides = document.querySelectorAll('.slide');
+    const totalSlidesNum = document.getElementById('total-slides-num');
+    const currentSlideNum = document.getElementById('current-slide-num');
+    const progressBar = document.getElementById('progress-bar');
+
+    let currentIdx = 0;
+    const totalSlides = slides.length;
+    totalSlidesNum.textContent = totalSlides;
+
+    function updateSlides() {
+      slides.forEach((slide, idx) => {
+        slide.classList.remove('active', 'previous');
+        if (idx === currentIdx) {
+          slide.classList.add('active');
+        } else if (idx < currentIdx) {
+          slide.classList.add('previous');
+        }
+      });
+
+      currentSlideNum.textContent = currentIdx + 1;
+      const progressPercent = ((currentIdx + 1) / totalSlides) * 100;
+      progressBar.style.width = `${progressPercent}%`;
+    }
+
+    function nextSlide() {
+      if (currentIdx < totalSlides - 1) {
+        currentIdx++;
+        updateSlides();
+      }
+    }
+
+    function prevSlide() {
+      if (currentIdx > 0) {
+        currentIdx--;
+        updateSlides();
+      }
+    }
+
+    // Keyboard controls
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+        e.preventDefault();
+        prevSlide();
+      }
+    });
+
+    // Button controls
+    document.getElementById('btn-next').addEventListener('click', nextSlide);
+    document.getElementById('btn-prev').addEventListener('click', prevSlide);
+
+    // Init progress bar
+    updateSlides();
+  </script>
+</body>
+
+</html>
